@@ -75,7 +75,7 @@ class LLMService:
                 return description.strip()
             except httpx.HTTPStatusError as exc:
                 log.warning("Groq API error for model %s: %s", model, exc.response.text)
-                last_error = f"API error {exc.response.status_code}"
+                last_error = f"API error {exc.response.status_code} ({model}): {exc.response.text}"
                 if exc.response.status_code not in (400, 429, 404):
                     break
             except Exception as exc:  # noqa: BLE001
