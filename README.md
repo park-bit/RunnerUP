@@ -307,19 +307,31 @@ The health server binds `0.0.0.0:$PORT`, so Render (and Docker) can reach it.
 
 ## Free-tier behavior
 
-Render's free Web Service **sleeps after inactivity** and restarts periodically.
-This bot is designed for that:
+Render's free Web Service **spins down after ~15 minutes with no inbound HTTP
+requests**, and only wakes when a new HTTP request arrives. This matters for a
+Discord bot: Discord talks to the bot over a **gateway WebSocket**, not over this
+service's HTTP port, so gateway traffic does **not** count as activity and will
+**not** keep the instance awake. Left alone, the service sleeps after ~15 minutes,
+the process is stopped, and the bot goes offline until something hits its HTTP
+endpoint again.
 
-- **No self-pinging.** The bot does not try to keep itself awake with background
-  traffic. (You *may* add an external uptime pinger against `/health` if you want
-  to reduce cold starts, but it isn't required and can burn your free hours.)
-- **Auto-reconnect.** discord.py reconnects the gateway automatically after a
-  sleep/restart.
+**To keep the bot online on the free tier, point an external uptime monitor at
+`/health`** (e.g. [UptimeRobot](https://uptimerobot.com) or
+[cron-job.org](https://cron-job.org)) on a ~10-minute interval. That steady
+trickle of requests keeps the instance from spinning down. A single always-on
+service fits within Render's free monthly instance-hours.
+
+Other notes:
+
 - **State resets on restart.** Rate-limit counters and the concurrency slot live
-  in memory and reset to empty when the instance restarts. There is nothing to
-  migrate or persist.
-- **Cold starts.** After sleeping, the first interaction may take a few seconds
-  while the instance wakes.
+  in memory and reset to empty whenever the instance restarts. There is nothing
+  to migrate or persist.
+- **Cold starts.** If the instance *has* spun down, the first request afterward
+  takes a few seconds while it wakes back up.
+- **Always-on without a pinger** needs a service type that never sleeps — on
+  Render that's a paid **Background Worker** (no HTTP port, never spun down). The
+  included `Dockerfile` also runs unchanged on always-on hosts like Fly.io if you
+  would rather not depend on a pinger.
 
 ---
 
