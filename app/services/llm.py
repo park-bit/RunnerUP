@@ -57,7 +57,7 @@ class LLMService:
             "temperature": 0.3,
         }
 
-        models_to_try = [self._model, "llama-3.1-8b-instant", "llama-3.3-70b-versatile", "gemma2-9b-it"]
+        models_to_try = [self._model, "openai/gpt-oss-120b", "gemma2-9b-it", "llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
         models_to_try = list(dict.fromkeys(models_to_try))
         
         first_error = ""
