@@ -167,9 +167,22 @@ class MessageHandler:
             view = InputView()
             prompt_msg = await self._reply(
                 message, 
-                "**Input Required:** Your code uses `input()`. Click the button below to provide the standard input (times out in 20s).", 
+                "**Input Required:** Your code uses `input()`. You can either **type your input directly in chat** below, or click the button. (times out in 20s)", 
                 view=view
             )
+            
+            def check(m):
+                return m.author == message.author and m.channel == message.channel
+            
+            async def wait_for_message():
+                try:
+                    msg = await client.wait_for('message', check=check, timeout=20.0)
+                    if not future.done():
+                        future.set_result(msg.content)
+                except asyncio.TimeoutError:
+                    pass
+
+            msg_task = asyncio.create_task(wait_for_message())
             
             try:
                 stdin_input = await asyncio.wait_for(future, timeout=20.0)
@@ -178,6 +191,8 @@ class MessageHandler:
                     await prompt_msg.edit(content="❌ **Input not provided.** Execution cancelled.", view=None)
                 return
             finally:
+                if not msg_task.done():
+                    msg_task.cancel()
                 if prompt_msg and future.done() and not future.cancelled():
                     try:
                         await prompt_msg.delete()
