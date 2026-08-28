@@ -78,7 +78,7 @@ BLOCKED_MODULES = frozenset(
 # Builtins/identifiers that are dangerous when *used*.
 BLOCKED_NAMES = frozenset(
     {
-        "eval", "exec", "compile", "open", "input", "__import__",
+        "eval", "exec", "compile", "open", "__import__",
         "breakpoint", "exit", "quit", "globals", "locals", "vars",
         "memoryview", "setattr", "delattr",
     }

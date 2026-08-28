@@ -56,7 +56,7 @@ _BLOCKED_MODULES = frozenset(
 
 _DENIED_BUILTINS = frozenset(
     {
-        "eval", "exec", "compile", "open", "input", "__import__",
+        "eval", "exec", "compile", "open", "__import__",
         "breakpoint", "exit", "quit", "globals", "locals", "vars",
         "memoryview", "setattr", "delattr",
         "help", "copyright", "credits", "license",

@@ -78,12 +78,12 @@ def format_execution(
         truncated = was_truncated or result.truncated
         if body.strip() == "":
             if result.images:
-                content = f"✅ Execution complete\n\n⏱️ {duration}"
+                content = f"Execution complete\n\n⏱️ {duration}"
             else:
-                content = f"✅ Execution complete\n\nNo output.\n\n⏱️ {duration}"
+                content = f"Execution complete\n\nNo output.\n\n⏱️ {duration}"
             return FormattedMessage(_with_note(content, truncated), images=result.images)
         content = (
-            "✅ Execution complete\n\n"
+            "Execution complete\n\n"
             f"```\n{_sanitize_for_block(body)}\n```\n\n"
             f"⏱️ {duration}"
         )

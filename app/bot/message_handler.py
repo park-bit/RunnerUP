@@ -247,11 +247,13 @@ class MessageHandler:
             for fname, fbytes in formatted.images:
                 files.append(discord.File(io.BytesIO(fbytes), filename=fname))
 
+            embed = discord.Embed(description=content, color=0x2b2d31)
+            
             if len(content) <= DISCORD_MESSAGE_LIMIT:
                 if files:
-                    await message.reply(content, files=files, allowed_mentions=_NO_PINGS)
+                    await message.reply(embed=embed, files=files, allowed_mentions=_NO_PINGS)
                 else:
-                    await message.reply(content, allowed_mentions=_NO_PINGS)
+                    await message.reply(embed=embed, allowed_mentions=_NO_PINGS)
                 return
 
             if formatted.file_text is not None:
@@ -262,14 +264,19 @@ class MessageHandler:
                 return
             
             # No file fallback available -> hard-trim to Discord's limit.
-            if files:
+            if formatted.file_text is not None:
+                fallback_embed = discord.Embed(
+                    description=f"⚠️ Output too long. See attached `{formatted.file_name}`.",
+                    color=0x2b2d31
+                )
                 await message.reply(
-                    content[:DISCORD_MESSAGE_LIMIT], files=files, allowed_mentions=_NO_PINGS
+                    embed=fallback_embed,
+                    files=files,
+                    allowed_mentions=_NO_PINGS,
                 )
             else:
-                await message.reply(
-                    content[:DISCORD_MESSAGE_LIMIT], allowed_mentions=_NO_PINGS
-                )
+                fallback_embed = discord.Embed(description="⚠️ Output too long, but no file available.", color=0xed4245)
+                await message.reply(embed=fallback_embed, allowed_mentions=_NO_PINGS)
         except discord.HTTPException as exc:
             log.warning("Failed to deliver result to channel: %s", type(exc).__name__)
 
