@@ -172,23 +172,27 @@ class MessageHandler:
         want_bot = mode in ("bot", "both")
         want_webhook = mode in ("webhook", "both")
 
-        delivered_webhook = False
-        if self.webhook.enabled:
-            if description:
-                # If we generated a description, send it to the webhook
-                delivered_webhook = await self.webhook.send(f"**Code Description:**\n{description}")
-            elif want_webhook:
-                # Otherwise, if webhook output is requested, send the output to the webhook
-                delivered_webhook = await self.webhook.send(
-                    formatted.content,
-                    file_text=formatted.file_text,
-                    file_name=formatted.file_name,
-                )
+        # If LLM is enabled, webhook is strictly for descriptions and bot is strictly for output.
+        if self.llm_service and self.llm_service.enabled:
+            if self.webhook.enabled:
+                if description:
+                    delivered_webhook = await self.webhook.send(f"**Code Description:**\n{description}")
+                else:
+                    delivered_webhook = await self.webhook.send("**Code Description:**\n*(Failed to generate description)*")
+            # Always send execution result to channel
+            await self._send_channel(message, formatted)
+            return
 
-        # Send to the channel when requested, or as a fallback whenever the
-        # webhook path did not actually deliver anything. If a description was
-        # sent to the webhook, we definitely want the bot to reply with the output.
-        if want_bot or not delivered_webhook or description:
+        # Fallback to original behavior if LLM is not enabled
+        delivered_webhook = False
+        if want_webhook and self.webhook.enabled:
+            delivered_webhook = await self.webhook.send(
+                formatted.content,
+                file_text=formatted.file_text,
+                file_name=formatted.file_name,
+            )
+
+        if want_bot or not delivered_webhook:
             await self._send_channel(message, formatted)
 
     async def _send_channel(
