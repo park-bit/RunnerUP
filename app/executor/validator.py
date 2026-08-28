@@ -201,14 +201,24 @@ class _DependencyVisitor(ast.NodeVisitor):
         for alias in node.names:
             root = alias.name.split(".")[0]
             if root not in BLOCKED_MODULES and root not in sys.stdlib_module_names:
-                self.dependencies.add(root)
+                import importlib.util
+                try:
+                    if importlib.util.find_spec(root) is None:
+                        self.dependencies.add(root)
+                except Exception:
+                    self.dependencies.add(root)
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module:
             root = node.module.split(".")[0]
             if root not in BLOCKED_MODULES and root not in sys.stdlib_module_names:
-                self.dependencies.add(root)
+                import importlib.util
+                try:
+                    if importlib.util.find_spec(root) is None:
+                        self.dependencies.add(root)
+                except Exception:
+                    self.dependencies.add(root)
         self.generic_visit(node)
 
 
