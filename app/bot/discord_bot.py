@@ -119,15 +119,21 @@ class PyRunnerClient(discord.Client):
                 blocks = extract_all_python_code(
                     message.content, allow_unmarked=self._allow_unmarked
                 )
-                if not blocks:
-                    return
-                code = "\n".join(blocks)
+                if blocks:
+                    code = "\n".join(blocks)
+                elif not self.settings.REQUIRE_PYTHON_CODE_BLOCK:
+                    code = message.content.strip()
             else:
-                code = extract_python_code(
+                extracted = extract_python_code(
                     message.content, allow_unmarked=self._allow_unmarked
                 )
-                if code is None:
-                    return
+                if extracted is not None:
+                    code = extracted
+                elif not self.settings.REQUIRE_PYTHON_CODE_BLOCK:
+                    code = message.content.strip()
+                    
+            if not code:
+                return
 
         # 3) Only now, with confirmed Python in hand, do we spend real work.
         await self._handler.handle(message, code, self)

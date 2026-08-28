@@ -33,7 +33,7 @@ services:
       - key: OUTPUT_MODE
         value: bot
       - key: REQUIRE_PYTHON_CODE_BLOCK
-        value: "true"
+        value: "false"
       - key: EXECUTE_ALL_BLOCKS
         value: "false"
       - key: LOG_LEVEL
