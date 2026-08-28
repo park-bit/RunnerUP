@@ -44,20 +44,42 @@ def build_intents() -> discord.Intents:
     return intents
 
 
+class MockMessage:
+    def __init__(self, interaction: discord.Interaction, code: str):
+        self.interaction = interaction
+        self.author = interaction.user
+        self.channel = interaction.channel
+        self.content = f"```python\n{code}\n```"
+        self.id = interaction.id
+
+    async def reply(self, content, allowed_mentions=None, files=None):
+        if not self.interaction.response.is_done():
+            await self.interaction.response.send_message(content, allowed_mentions=allowed_mentions, files=files or [])
+        else:
+            await self.interaction.followup.send(content, allowed_mentions=allowed_mentions, files=files or [])
+
+
 class PyRunnerClient(discord.Client):
     """A minimal client that runs Python found in fenced code blocks."""
 
     def __init__(self, handler: MessageHandler, settings: Settings, **kwargs) -> None:
-        # Disable the internal message cache: we act on messages as they arrive
-        # and never need history, so this trims idle memory on the free tier.
         kwargs.setdefault("max_messages", None)
         super().__init__(intents=build_intents(), **kwargs)
         self._handler = handler
         self._settings = settings
         self._allow_unmarked = settings.allow_unmarked_blocks()
         self._execute_all = settings.EXECUTE_ALL_BLOCKS
-        # Held so the app can close the HTTP client cleanly on shutdown.
         self.webhook = handler.webhook
+        self.tree = discord.app_commands.CommandTree(self)
+
+    async def setup_hook(self) -> None:
+        @self.tree.command(name="code", description="Run Python code directly")
+        async def code_command(interaction: discord.Interaction, code: str):
+            await interaction.response.defer()
+            mock_msg = MockMessage(interaction, code)
+            await self._handler.handle(mock_msg, code, self)
+        
+        await self.tree.sync()
 
     async def on_ready(self) -> None:
         user = self.user
