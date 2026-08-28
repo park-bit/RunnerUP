@@ -39,6 +39,7 @@ from app.executor.models import ExecutionResult
 from app.services.concurrency import ConcurrencyGuard
 from app.services.rate_limiter import RateLimiter
 from app.services.webhook import WebhookNotifier
+from app.services.llm import LLMService
 from app.utils import formatter
 from app.utils.formatter import DISCORD_MESSAGE_LIMIT, FormattedMessage
 
@@ -58,12 +59,14 @@ class MessageHandler:
         rate_limiter: RateLimiter,
         guard: ConcurrencyGuard,
         webhook: WebhookNotifier,
+        llm_service: LLMService | None = None,
         settings: Settings,
     ) -> None:
         self.executor = executor
         self.rate_limiter = rate_limiter
         self.guard = guard
         self.webhook = webhook
+        self.llm_service = llm_service
         self.settings = settings
 
     # -- entry point ----------------------------------------------------------
@@ -117,8 +120,17 @@ class MessageHandler:
             return
 
         # 5) Execute (bounded), releasing the slot no matter what happens.
+        # Run LLM description concurrently if configured.
         try:
-            result = await self._execute_with_typing(message, code)
+            if self.llm_service and self.llm_service.enabled and self.webhook.enabled:
+                import asyncio
+                result, description = await asyncio.gather(
+                    self._execute_with_typing(message, code),
+                    self.llm_service.describe_code(code),
+                )
+            else:
+                result = await self._execute_with_typing(message, code)
+                description = ""
         finally:
             self.guard.release()
 
@@ -128,7 +140,7 @@ class MessageHandler:
             timeout_seconds=s.MAX_EXECUTION_TIME,
             max_output_length=s.MAX_OUTPUT_LENGTH,
         )
-        await self._deliver_result(message, formatted)
+        await self._deliver_result(message, formatted, description=description)
 
     async def _execute_with_typing(
         self, message: discord.Message, code: str
@@ -153,24 +165,30 @@ class MessageHandler:
 
     # -- delivery -------------------------------------------------------------
     async def _deliver_result(
-        self, message: discord.Message, formatted: FormattedMessage
+        self, message: discord.Message, formatted: FormattedMessage, *, description: str = ""
     ) -> None:
         """Deliver an execution result honoring ``OUTPUT_MODE``."""
         mode = self.settings.OUTPUT_MODE
         want_bot = mode in ("bot", "both")
         want_webhook = mode in ("webhook", "both")
 
-        delivered = False
-        if want_webhook and self.webhook.enabled:
-            delivered = await self.webhook.send(
-                formatted.content,
-                file_text=formatted.file_text,
-                file_name=formatted.file_name,
-            )
+        delivered_webhook = False
+        if self.webhook.enabled:
+            if description:
+                # If we generated a description, send it to the webhook
+                delivered_webhook = await self.webhook.send(f"**Code Description:**\n{description}")
+            elif want_webhook:
+                # Otherwise, if webhook output is requested, send the output to the webhook
+                delivered_webhook = await self.webhook.send(
+                    formatted.content,
+                    file_text=formatted.file_text,
+                    file_name=formatted.file_name,
+                )
 
         # Send to the channel when requested, or as a fallback whenever the
-        # webhook path did not actually deliver anything.
-        if want_bot or not delivered:
+        # webhook path did not actually deliver anything. If a description was
+        # sent to the webhook, we definitely want the bot to reply with the output.
+        if want_bot or not delivered_webhook or description:
             await self._send_channel(message, formatted)
 
     async def _send_channel(

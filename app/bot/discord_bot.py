@@ -103,6 +103,7 @@ def build_client(settings: Settings = global_settings) -> PyRunnerClient:
     from app.services.concurrency import ConcurrencyGuard
     from app.services.rate_limiter import RateLimiter
     from app.services.webhook import WebhookNotifier
+    from app.services.llm import LLMService
 
     executor = build_default_executor()
     rate_limiter = RateLimiter(
@@ -115,11 +116,13 @@ def build_client(settings: Settings = global_settings) -> PyRunnerClient:
         max_queue=settings.MAX_QUEUE_SIZE,
     )
     webhook = WebhookNotifier(settings.DISCORD_WEBHOOK_URL)
+    llm_service = LLMService(api_key=settings.GROQ_API_KEY, model=settings.GROQ_MODEL)
     handler = MessageHandler(
         executor=executor,
         rate_limiter=rate_limiter,
         guard=guard,
         webhook=webhook,
+        llm_service=llm_service,
         settings=settings,
     )
     return PyRunnerClient(handler, settings)

@@ -53,6 +53,10 @@ class Settings:
     # --- Secrets (never log these) ---
     DISCORD_TOKEN: str = _get_str("DISCORD_TOKEN")
     DISCORD_WEBHOOK_URL: str = _get_str("DISCORD_WEBHOOK_URL")
+    GROQ_API_KEY: str = _get_str("GROQ_API_KEY")
+
+    # --- Groq ---
+    GROQ_MODEL: str = _get_str("GROQ_MODEL", "llama3-8b-8192")
 
     # --- Web server (Render provides PORT) ---
     PORT: int = _get_int("PORT", 10000)
