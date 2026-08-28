@@ -164,10 +164,20 @@ class MessageHandler:
                         return
                     await interaction.response.send_modal(InputModal())
 
+            import re
+            prompts = re.findall(r'input\s*\(\s*(["\'])(.*?)\1\s*\)', code)
+            prompt_hints = [p[1] for p in prompts if p[1]]
+            
+            if prompt_hints:
+                hints_text = "\n".join(f"- `{h}`" for h in prompt_hints)
+                prompt_text = f"**Input Required:** Your code asks for:\n{hints_text}\n\nYou can either **type your input directly in chat** below, or click the button. (times out in 20s)"
+            else:
+                prompt_text = "**Input Required:** Your code uses `input()`. You can either **type your input directly in chat** below, or click the button. (times out in 20s)"
+
             view = InputView()
             prompt_msg = await self._reply(
                 message, 
-                "**Input Required:** Your code uses `input()`. You can either **type your input directly in chat** below, or click the button. (times out in 20s)", 
+                prompt_text, 
                 view=view
             )
             
