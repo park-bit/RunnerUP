@@ -39,10 +39,11 @@ class WebhookNotifier:
 
     async def send(
         self,
-        content: str,
+        content: str = "",
         *,
         file_text: Optional[str] = None,
         file_name: str = "output.txt",
+        embeds: Optional[list] = None,
     ) -> bool:
         """Post to the webhook. Returns True on success, False otherwise.
 
@@ -52,9 +53,13 @@ class WebhookNotifier:
             return False
         client = self._get_client()
         try:
+            payload = {"allowed_mentions": _NO_MENTIONS}
+            if content:
+                payload["content"] = content[:_WEBHOOK_CONTENT_LIMIT]
+            if embeds:
+                payload["embeds"] = embeds
+
             if file_text is not None and len(content) > _WEBHOOK_CONTENT_LIMIT:
-                short = content[:_WEBHOOK_CONTENT_LIMIT]
-                payload = {"content": short, "allowed_mentions": _NO_MENTIONS}
                 files = {
                     "files[0]": (
                         file_name,
@@ -68,10 +73,6 @@ class WebhookNotifier:
                     files=files,
                 )
             else:
-                payload = {
-                    "content": content[:_WEBHOOK_CONTENT_LIMIT],
-                    "allowed_mentions": _NO_MENTIONS,
-                }
                 resp = await client.post(self._url, json=payload)
             resp.raise_for_status()
             return True

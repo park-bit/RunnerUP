@@ -165,7 +165,13 @@ class MessageHandler:
                 
                 async def fetch_and_send_description(code_text: str):
                     desc = await self.llm_service.describe_code(code_text)
-                    await self.webhook.send(f"**Code Description:**\n{desc}")
+                    color = 0xed4245 if desc.startswith("(Failed") else 0x5865F2
+                    embed = {
+                        "title": "Code Description",
+                        "description": desc,
+                        "color": color,
+                    }
+                    await self.webhook.send(embeds=[embed])
                 
                 asyncio.create_task(fetch_and_send_description(code))
                 
