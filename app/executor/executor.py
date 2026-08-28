@@ -223,13 +223,11 @@ class SubprocessExecutor(CodeExecutor):
         # Inject input hook to echo stdin, simulating a real terminal
         if "input" in code:
             code = (
-                "import builtins\n"
-                "_orig_input = builtins.input\n"
-                "def _hooked_input(prompt=''):\n"
+                "_orig_input = input\n"
+                "def input(prompt=''):\n"
                 "    val = _orig_input(prompt)\n"
                 "    print(val)\n"
                 "    return val\n"
-                "builtins.input = _hooked_input\n"
             ) + code
 
         stdout = bytearray()
