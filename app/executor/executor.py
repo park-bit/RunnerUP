@@ -213,6 +213,7 @@ class SubprocessExecutor(CodeExecutor):
                 "import matplotlib\n"
                 "matplotlib.use('Agg')\n"
                 "import matplotlib.pyplot\n"
+                "matplotlib.style.use('dark_background')\n"
                 "def _hooked_show(*args, **kwargs):\n"
                 "    import uuid\n"
                 "    matplotlib.pyplot.savefig(f'plot_{uuid.uuid4().hex}.png')\n"
