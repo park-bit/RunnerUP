@@ -52,11 +52,12 @@ class MockMessage:
         self.content = f"```python\n{code}\n```"
         self.id = interaction.id
 
-    async def reply(self, content, allowed_mentions=None, files=None):
+    async def reply(self, content=None, **kwargs):
         if not self.interaction.response.is_done():
-            await self.interaction.response.send_message(content, allowed_mentions=allowed_mentions, files=files or [])
+            await self.interaction.response.send_message(content, **kwargs)
+            return await self.interaction.original_response()
         else:
-            await self.interaction.followup.send(content, allowed_mentions=allowed_mentions, files=files or [])
+            return await self.interaction.followup.send(content, **kwargs)
 
 
 class PyRunnerClient(discord.Client):
