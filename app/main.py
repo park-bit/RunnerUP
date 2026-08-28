@@ -46,11 +46,11 @@ def create_health_app() -> FastAPI:
         openapi_url=None,
     )
 
-    @app.get("/")
+    @app.api_route("/", methods=["GET", "HEAD"])
     async def root() -> dict:  # noqa: D401 - trivial
         return {"status": "ok"}
 
-    @app.get("/health")
+    @app.api_route("/health", methods=["GET", "HEAD"])
     async def health() -> dict:
         return {"status": "ok"}
 
