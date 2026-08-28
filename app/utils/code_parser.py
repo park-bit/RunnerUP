@@ -26,9 +26,9 @@ _UNMARKED = ""
 #   ```<lang>\n<code>```
 # - "lang": the text after the opening ``` on the same line (may be empty).
 #   It cannot contain a newline or a backtick.
-# - "code": everything up to the next ``` (DOTALL so it can span lines).
+# - "code": everything up to the next ``` or the end of the string (DOTALL).
 # Non-greedy + finditer yields blocks left-to-right, non-overlapping.
-_FENCE_RE = re.compile(r"```(?P<lang>[^\n`]*)\n(?P<code>.*?)```", re.DOTALL)
+_FENCE_RE = re.compile(r"```(?P<lang>[^\n`]*)\n(?P<code>.*?)(?:```|\Z)", re.DOTALL)
 
 
 def _normalize(content: str) -> str:
