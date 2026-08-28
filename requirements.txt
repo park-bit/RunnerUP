@@ -13,3 +13,10 @@ httpx==0.28.1
 
 # Loads a local .env during development (no-op in production).
 python-dotenv==1.0.1
+
+# Popular libraries
+numpy
+pandas
+matplotlib
+scipy
+requests
