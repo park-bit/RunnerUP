@@ -57,10 +57,10 @@ class LLMService:
             "temperature": 0.3,
         }
 
-        models_to_try = [self._model, "llama-3.1-8b-instant", "gemma2-9b-it", "mixtral-8x7b-32768"]
+        models_to_try = [self._model, "llama-3.1-8b-instant", "llama-3.3-70b-versatile", "gemma2-9b-it"]
         models_to_try = list(dict.fromkeys(models_to_try))
         
-        last_error = ""
+        first_error = ""
         for model in models_to_try:
             payload["model"] = model
             try:
@@ -75,15 +75,17 @@ class LLMService:
                 return description.strip()
             except httpx.HTTPStatusError as exc:
                 log.warning("Groq API error for model %s: %s", model, exc.response.text)
-                last_error = f"API error {exc.response.status_code} ({model}): {exc.response.text}"
+                if not first_error:
+                    first_error = f"API error {exc.response.status_code} ({model}): {exc.response.text}"
                 if exc.response.status_code not in (400, 429, 404):
                     break
             except Exception as exc:  # noqa: BLE001
                 log.warning("Failed to generate code description from Groq (model %s): %s", model, type(exc).__name__)
-                last_error = str(exc)
+                if not first_error:
+                    first_error = str(exc)
                 break
 
-        return f"(Failed to generate description: {last_error})"
+        return f"(Failed to generate description: {first_error})"
 
     async def close(self) -> None:
         if self._client is not None:
