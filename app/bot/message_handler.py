@@ -167,7 +167,7 @@ class MessageHandler:
             view = InputView()
             prompt_msg = await self._reply(
                 message, 
-                "⚠️ **Input Required:** Your code uses `input()`. Click the button below to provide the standard input (times out in 20s).", 
+                "**Input Required:** Your code uses `input()`. Click the button below to provide the standard input (times out in 20s).", 
                 view=view
             )
             
@@ -178,11 +178,9 @@ class MessageHandler:
                     await prompt_msg.edit(content="❌ **Input not provided.** Execution cancelled.", view=None)
                 return
             finally:
-                if prompt_msg:
-                    for child in view.children:
-                        child.disabled = True
+                if prompt_msg and future.done() and not future.cancelled():
                     try:
-                        await prompt_msg.edit(view=view)
+                        await prompt_msg.delete()
                     except Exception:
                         pass
 
