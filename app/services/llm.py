@@ -67,9 +67,12 @@ class LLMService:
             data = resp.json()
             description = data["choices"][0]["message"]["content"]
             return description.strip()
+        except httpx.HTTPStatusError as exc:
+            log.warning("Groq API error: %s", exc.response.text)
+            return f"(Failed to generate description: API error {exc.response.status_code})"
         except Exception as exc:  # noqa: BLE001
             log.warning("Failed to generate code description from Groq: %s", type(exc).__name__)
-            return ""
+            return f"(Failed to generate description: {exc})"
 
     async def close(self) -> None:
         if self._client is not None:

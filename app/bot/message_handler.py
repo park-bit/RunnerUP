@@ -118,9 +118,10 @@ class MessageHandler:
         deps = validation.extract_dependencies(code)
         if deps:
             import asyncio
+            import sys
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    "python", "-m", "pip", "install", "-q", *deps,
+                    sys.executable, "-m", "pip", "install", "-q", *deps,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
@@ -208,10 +209,7 @@ class MessageHandler:
         # If LLM is enabled, webhook is strictly for descriptions and bot is strictly for output.
         if self.llm_service and self.llm_service.enabled:
             if self.webhook.enabled:
-                if description:
-                    delivered_webhook = await self.webhook.send(f"**Code Description:**\n{description}")
-                else:
-                    delivered_webhook = await self.webhook.send("**Code Description:**\n*(Failed to generate description)*")
+                delivered_webhook = await self.webhook.send(f"**Code Description:**\n{description}")
             # Always send execution result to channel
             await self._send_channel(message, formatted)
             return
