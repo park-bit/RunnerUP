@@ -158,17 +158,18 @@ class MessageHandler:
             return
 
         # 5) Execute (bounded), releasing the slot no matter what happens.
-        # Run LLM description concurrently if configured.
+        # Fire off LLM description concurrently in the background if configured.
         try:
             if self.llm_service and self.llm_service.enabled and self.webhook.enabled:
                 import asyncio
-                result, description = await asyncio.gather(
-                    self._execute_with_typing(message, code, stdin_input),
-                    self.llm_service.describe_code(code),
-                )
-            else:
-                result = await self._execute_with_typing(message, code, stdin_input)
-                description = ""
+                
+                async def fetch_and_send_description(code_text: str):
+                    desc = await self.llm_service.describe_code(code_text)
+                    await self.webhook.send(f"**Code Description:**\n{desc}")
+                
+                asyncio.create_task(fetch_and_send_description(code))
+                
+            result = await self._execute_with_typing(message, code, stdin_input)
         finally:
             self.guard.release()
 
@@ -178,7 +179,7 @@ class MessageHandler:
             timeout_seconds=s.MAX_EXECUTION_TIME,
             max_output_length=s.MAX_OUTPUT_LENGTH,
         )
-        await self._deliver_result(message, formatted, description=description)
+        await self._deliver_result(message, formatted)
 
     async def _execute_with_typing(
         self, message: discord.Message, code: str, stdin_input: str = ""
@@ -203,7 +204,7 @@ class MessageHandler:
 
     # -- delivery -------------------------------------------------------------
     async def _deliver_result(
-        self, message: discord.Message, formatted: FormattedMessage, *, description: str = ""
+        self, message: discord.Message, formatted: FormattedMessage
     ) -> None:
         """Deliver an execution result honoring ``OUTPUT_MODE``."""
         mode = self.settings.OUTPUT_MODE
@@ -212,8 +213,6 @@ class MessageHandler:
 
         # If LLM is enabled, webhook is strictly for descriptions and bot is strictly for output.
         if self.llm_service and self.llm_service.enabled:
-            if self.webhook.enabled:
-                delivered_webhook = await self.webhook.send(f"**Code Description:**\n{description}")
             # Always send execution result to channel
             await self._send_channel(message, formatted)
             return
