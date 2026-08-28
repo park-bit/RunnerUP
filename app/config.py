@@ -56,7 +56,7 @@ class Settings:
     GROQ_API_KEY: str = _get_str("GROQ_API_KEY")
 
     # --- Groq ---
-    GROQ_MODEL: str = _get_str("GROQ_MODEL", "llama3-8b-8192")
+    GROQ_MODEL: str = _get_str("GROQ_MODEL", "llama-3.1-8b-instant")
 
     # --- Web server (Render provides PORT) ---
     PORT: int = _get_int("PORT", 10000)

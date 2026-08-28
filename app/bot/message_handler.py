@@ -125,7 +125,11 @@ class MessageHandler:
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
-                await asyncio.wait_for(proc.wait(), timeout=15.0)
+                await asyncio.wait_for(proc.wait(), timeout=60.0)
+                if proc.returncode != 0:
+                    log.warning("Pip install failed with return code %s", proc.returncode)
+            except asyncio.TimeoutError:
+                log.warning("Pip install timed out for dependencies: %s", deps)
             except Exception as e:
                 log.warning("Failed to install dependencies %s: %s", deps, e)
 

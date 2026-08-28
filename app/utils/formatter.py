@@ -84,7 +84,7 @@ def format_execution(
             f"```\n{_sanitize_for_block(body)}\n```\n\n"
             f"⏱️ {duration}"
         )
-        return FormattedMessage(_with_note(content, truncated), file_text=result.stdout, images=result.images)
+        return FormattedMessage(_with_note(content, truncated), images=result.images)
 
     # ERROR or MEMORY -> show program output (if any) followed by the traceback.
     combined = ""
@@ -101,7 +101,7 @@ def format_execution(
         f"```\n{_sanitize_for_block(body)}\n```\n\n"
         f"⏱️ {duration}"
     )
-    return FormattedMessage(_with_note(content, truncated), file_text=combined, images=result.images)
+    return FormattedMessage(_with_note(content, truncated), images=result.images)
 
 
 def format_syntax_error(detail: str) -> FormattedMessage:
