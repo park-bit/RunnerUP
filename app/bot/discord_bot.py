@@ -99,19 +99,34 @@ class PyRunnerClient(discord.Client):
 
         # 2) Strict detection. Pure string work that returns None for prose,
         #    other languages, or unmarked blocks (unless explicitly allowed).
-        if self._execute_all:
-            blocks = extract_all_python_code(
-                message.content, allow_unmarked=self._allow_unmarked
-            )
-            if not blocks:
-                return
-            code = "\n".join(blocks)
-        else:
-            code = extract_python_code(
-                message.content, allow_unmarked=self._allow_unmarked
-            )
-            if code is None:
-                return
+        
+        code = None
+        # Check for .py file attachments first
+        if message.attachments:
+            for attachment in message.attachments:
+                if attachment.filename.endswith('.py'):
+                    try:
+                        code_bytes = await attachment.read()
+                        code = code_bytes.decode('utf-8')
+                        break
+                    except Exception as e:
+                        log.warning("Failed to read attachment %s: %s", attachment.filename, e)
+        
+        # If no valid python file was attached, try parsing the message text
+        if code is None:
+            if self._execute_all:
+                blocks = extract_all_python_code(
+                    message.content, allow_unmarked=self._allow_unmarked
+                )
+                if not blocks:
+                    return
+                code = "\n".join(blocks)
+            else:
+                code = extract_python_code(
+                    message.content, allow_unmarked=self._allow_unmarked
+                )
+                if code is None:
+                    return
 
         # 3) Only now, with confirmed Python in hand, do we spend real work.
         await self._handler.handle(message, code, self)
