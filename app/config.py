@@ -65,7 +65,7 @@ class Settings:
     # --- Detection behavior ---
     # When True (default) only explicit ```python / ```py blocks are executed.
     # When False, unmarked ``` ``` fenced blocks are also treated as Python.
-    REQUIRE_PYTHON_CODE_BLOCK: bool = _get_bool("REQUIRE_PYTHON_CODE_BLOCK", True)
+    REQUIRE_PYTHON_CODE_BLOCK: bool = _get_bool("REQUIRE_PYTHON_CODE_BLOCK", False)
     # When True, and a message has several Python blocks, all are joined and run.
     # Default False -> only the FIRST Python block runs (blocks are never
     # concatenated automatically).
