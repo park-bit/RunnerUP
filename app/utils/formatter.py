@@ -27,6 +27,12 @@ class FormattedMessage:
     # Full, un-fenced output for the file fallback when ``content`` is too long.
     file_text: Optional[str] = None
     file_name: str = "output.txt"
+    # Generated images as (filename, bytes)
+    images: list[tuple[str, bytes]] = None
+
+    def __post_init__(self):
+        if self.images is None:
+            self.images = []
 
 
 def _sanitize_for_block(text: str) -> str:
@@ -72,13 +78,13 @@ def format_execution(
         truncated = was_truncated or result.truncated
         if body.strip() == "":
             content = f"✅ Execution complete\n\nNo output.\n\n⏱️ {duration}"
-            return FormattedMessage(_with_note(content, truncated))
+            return FormattedMessage(_with_note(content, truncated), images=result.images)
         content = (
             "✅ Execution complete\n\n"
             f"```\n{_sanitize_for_block(body)}\n```\n\n"
             f"⏱️ {duration}"
         )
-        return FormattedMessage(_with_note(content, truncated), file_text=result.stdout)
+        return FormattedMessage(_with_note(content, truncated), file_text=result.stdout, images=result.images)
 
     # ERROR or MEMORY -> show program output (if any) followed by the traceback.
     combined = ""
@@ -95,7 +101,7 @@ def format_execution(
         f"```\n{_sanitize_for_block(body)}\n```\n\n"
         f"⏱️ {duration}"
     )
-    return FormattedMessage(_with_note(content, truncated), file_text=combined)
+    return FormattedMessage(_with_note(content, truncated), file_text=combined, images=result.images)
 
 
 def format_syntax_error(detail: str) -> FormattedMessage:

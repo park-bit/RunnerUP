@@ -27,6 +27,8 @@ import os
 import signal
 import sys
 import time
+import tempfile
+import glob
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -61,7 +63,7 @@ class CodeExecutor(abc.ABC):
     """Abstract execution backend."""
 
     @abc.abstractmethod
-    async def execute(self, code: str) -> ExecutionResult:
+    async def execute(self, code: str, stdin_input: str = "") -> ExecutionResult:
         """Run ``code`` and return a bounded :class:`ExecutionResult`."""
         raise NotImplementedError
 
@@ -113,12 +115,13 @@ class SubprocessExecutor(CodeExecutor):
                     env[key] = value
         return env
 
-    async def _spawn(self, code: str) -> asyncio.subprocess.Process:
+    async def _spawn(self, code: str, cwd: str, use_stdin: bool) -> asyncio.subprocess.Process:
         kwargs: dict = dict(
-            stdin=asyncio.subprocess.DEVNULL,
+            stdin=asyncio.subprocess.PIPE if use_stdin else asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=self._build_env(code),
+            cwd=cwd,
         )
         if _IS_POSIX:
             # New session -> the child is a process-group leader we can kill
@@ -201,52 +204,85 @@ class SubprocessExecutor(CodeExecutor):
         return ExecutionStatus.ERROR
 
     # -- public API -----------------------------------------------------------
-    async def execute(self, code: str) -> ExecutionResult:
+    async def execute(self, code: str, stdin_input: str = "") -> ExecutionResult:
         start = time.perf_counter()
-        try:
-            proc = await self._spawn(code)
-        except Exception as exc:  # noqa: BLE001
-            return ExecutionResult(
-                status=ExecutionStatus.INTERNAL_ERROR,
-                duration=time.perf_counter() - start,
-                message=f"Failed to start execution process: {exc}",
-            )
+        
+        # Inject matplotlib override if needed to save plots automatically
+        if "matplotlib" in code or "pyplot" in code:
+            code = (
+                "import matplotlib\n"
+                "matplotlib.use('Agg')\n"
+                "import matplotlib.pyplot\n"
+                "def _hooked_show(*args, **kwargs):\n"
+                "    import uuid\n"
+                "    matplotlib.pyplot.savefig(f'plot_{uuid.uuid4().hex}.png')\n"
+                "matplotlib.pyplot.show = _hooked_show\n"
+            ) + code
 
         stdout = bytearray()
         stderr = bytearray()
         truncated = _Flag()
         timed_out = False
         killed_by_us = False
+        images = []
 
-        try:
-            drain = asyncio.gather(
-                self._drain(proc.stdout, stdout, truncated),
-                self._drain(proc.stderr, stderr, truncated),
-            )
+        with tempfile.TemporaryDirectory() as cwd:
             try:
-                await asyncio.wait_for(drain, timeout=self.timeout)
-            except asyncio.TimeoutError:
-                timed_out = True
-                killed_by_us = True
-                self._kill(proc)
-                await self._safe_wait(proc, 3.0)
-            else:
-                if not await self._safe_wait(proc, 1.0):
+                proc = await self._spawn(code, cwd, bool(stdin_input))
+            except Exception as exc:  # noqa: BLE001
+                return ExecutionResult(
+                    status=ExecutionStatus.INTERNAL_ERROR,
+                    duration=time.perf_counter() - start,
+                    message=f"Failed to start execution process: {exc}",
+                )
+
+            if stdin_input and proc.stdin:
+                try:
+                    proc.stdin.write(stdin_input.encode("utf-8"))
+                    await proc.stdin.drain()
+                    proc.stdin.close()
+                except Exception:
+                    pass
+
+            try:
+                drain = asyncio.gather(
+                    self._drain(proc.stdout, stdout, truncated),
+                    self._drain(proc.stderr, stderr, truncated),
+                )
+                try:
+                    await asyncio.wait_for(drain, timeout=self.timeout)
+                except asyncio.TimeoutError:
+                    timed_out = True
                     killed_by_us = True
                     self._kill(proc)
                     await self._safe_wait(proc, 3.0)
-        except Exception as exc:  # noqa: BLE001 - never let the bot crash
-            killed_by_us = True
-            self._kill(proc)
-            await self._safe_wait(proc, 3.0)
-            return ExecutionResult(
-                status=ExecutionStatus.INTERNAL_ERROR,
-                stdout=_decode(stdout),
-                stderr=_decode(stderr),
-                duration=time.perf_counter() - start,
-                truncated=truncated.value,
-                message=f"Execution harness error: {exc}",
-            )
+                else:
+                    if not await self._safe_wait(proc, 1.0):
+                        killed_by_us = True
+                        self._kill(proc)
+                        await self._safe_wait(proc, 3.0)
+            except Exception as exc:  # noqa: BLE001 - never let the bot crash
+                killed_by_us = True
+                self._kill(proc)
+                await self._safe_wait(proc, 3.0)
+                return ExecutionResult(
+                    status=ExecutionStatus.INTERNAL_ERROR,
+                    stdout=_decode(stdout),
+                    stderr=_decode(stderr),
+                    duration=time.perf_counter() - start,
+                    truncated=truncated.value,
+                    message=f"Execution harness error: {exc}",
+                )
+            
+            # Read generated images from the temp directory (up to 5)
+            for img_path in glob.glob(os.path.join(cwd, "*.png")) + glob.glob(os.path.join(cwd, "*.jpg")):
+                if len(images) >= 5:
+                    break
+                try:
+                    with open(img_path, "rb") as f:
+                        images.append((os.path.basename(img_path), f.read()))
+                except Exception:
+                    pass
 
         duration = time.perf_counter() - start
         out_text = _decode(stdout)
@@ -264,6 +300,7 @@ class SubprocessExecutor(CodeExecutor):
             stderr=err_text,
             duration=duration,
             truncated=truncated.value,
+            images=images,
         )
 
 

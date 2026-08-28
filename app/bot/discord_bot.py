@@ -92,7 +92,7 @@ class PyRunnerClient(discord.Client):
                 return
 
         # 3) Only now, with confirmed Python in hand, do we spend real work.
-        await self._handler.handle(message, code)
+        await self._handler.handle(message, code, self)
 
 
 def build_client(settings: Settings = global_settings) -> PyRunnerClient:

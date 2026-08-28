@@ -21,8 +21,9 @@ section. The intended deployment is a trusted/private server.
 from __future__ import annotations
 
 import ast
+import sys
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Set
 
 # --- Result categories -----------------------------------------------------
 CATEGORY_TOO_LONG = "too_long"
@@ -190,3 +191,60 @@ def validate(code: str, max_length: int) -> ValidationResult:
     if not length_result.ok:
         return length_result
     return validate_security(code)
+
+
+class _DependencyVisitor(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.dependencies: Set[str] = set()
+
+    def visit_Import(self, node: ast.Import) -> None:
+        for alias in node.names:
+            root = alias.name.split(".")[0]
+            if root not in BLOCKED_MODULES and root not in sys.stdlib_module_names:
+                self.dependencies.add(root)
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        if node.module:
+            root = node.module.split(".")[0]
+            if root not in BLOCKED_MODULES and root not in sys.stdlib_module_names:
+                self.dependencies.add(root)
+        self.generic_visit(node)
+
+
+def extract_dependencies(code: str) -> Set[str]:
+    """Parse the code and return a set of allowed third-party root modules."""
+    if not code or code.strip() == "":
+        return set()
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return set()
+    
+    visitor = _DependencyVisitor()
+    visitor.visit(tree)
+    return visitor.dependencies
+
+
+class _InputVisitor(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.has_input = False
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if isinstance(node.func, ast.Name) and node.func.id == "input":
+            self.has_input = True
+        self.generic_visit(node)
+
+
+def requires_input(code: str) -> bool:
+    """Return True if the code contains a call to `input()`."""
+    if not code or code.strip() == "":
+        return False
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return False
+    
+    visitor = _InputVisitor()
+    visitor.visit(tree)
+    return visitor.has_input

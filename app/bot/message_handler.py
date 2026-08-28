@@ -70,10 +70,10 @@ class MessageHandler:
         self.settings = settings
 
     # -- entry point ----------------------------------------------------------
-    async def handle(self, message: discord.Message, code: str) -> None:
+    async def handle(self, message: discord.Message, code: str, client: discord.Client = None) -> None:
         """Top-level guard so a failure never bubbles into the event loop."""
         try:
-            await self._process(message, code)
+            await self._process(message, code, client)
         except Exception:  # noqa: BLE001 - the listener must never crash
             log.exception(
                 "Unhandled error while processing message %s",
@@ -81,7 +81,7 @@ class MessageHandler:
             )
 
     # -- pipeline -------------------------------------------------------------
-    async def _process(self, message: discord.Message, code: str) -> None:
+    async def _process(self, message: discord.Message, code: str, client: discord.Client = None) -> None:
         s = self.settings
 
         # 1) Size / emptiness. The cheapest possible gate.
@@ -114,6 +114,39 @@ class MessageHandler:
                 await self._reply(message, formatter.blocked_message(security.reason))
             return
 
+        # 3.1) Auto-install dependencies
+        deps = validation.extract_dependencies(code)
+        if deps:
+            import asyncio
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "python", "-m", "pip", "install", "-q", *deps,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                await asyncio.wait_for(proc.wait(), timeout=15.0)
+            except Exception as e:
+                log.warning("Failed to install dependencies %s: %s", deps, e)
+
+        # 3.2) Interactive input
+        stdin_input = ""
+        if client and validation.requires_input(code):
+            await self._reply(message, "Code requires input. Please reply with your input wrapped in ```input ... ``` within 20 seconds.")
+            import asyncio
+            import re
+            
+            def check(m):
+                return m.author == message.author and m.channel == message.channel and "```input" in m.content
+            
+            try:
+                input_msg = await client.wait_for('message', check=check, timeout=20.0)
+                match = re.search(r"```input\s*\n(.*?)\n?```", input_msg.content, re.DOTALL)
+                if match:
+                    stdin_input = match.group(1)
+            except asyncio.TimeoutError:
+                await self._reply(message, "Input not provided.")
+                return
+
         # 4) Concurrency slot: at most one execution at a time (+ tiny queue).
         if not await self.guard.acquire():
             await self._reply(message, formatter.busy_message())
@@ -125,11 +158,11 @@ class MessageHandler:
             if self.llm_service and self.llm_service.enabled and self.webhook.enabled:
                 import asyncio
                 result, description = await asyncio.gather(
-                    self._execute_with_typing(message, code),
+                    self._execute_with_typing(message, code, stdin_input),
                     self.llm_service.describe_code(code),
                 )
             else:
-                result = await self._execute_with_typing(message, code)
+                result = await self._execute_with_typing(message, code, stdin_input)
                 description = ""
         finally:
             self.guard.release()
@@ -143,7 +176,7 @@ class MessageHandler:
         await self._deliver_result(message, formatted, description=description)
 
     async def _execute_with_typing(
-        self, message: discord.Message, code: str
+        self, message: discord.Message, code: str, stdin_input: str = ""
     ) -> ExecutionResult:
         """Run the code, showing a typing indicator while it works.
 
@@ -157,7 +190,7 @@ class MessageHandler:
         except Exception:  # noqa: BLE001 - typing is optional
             typing_cm = None
         try:
-            return await self.executor.execute(code)
+            return await self.executor.execute(code, stdin_input)
         finally:
             if typing_cm is not None:
                 with contextlib.suppress(Exception):
@@ -200,20 +233,36 @@ class MessageHandler:
     ) -> None:
         content = formatted.content
         try:
+            files = []
+            if formatted.file_text is not None:
+                files.append(self._as_file(formatted.file_text, formatted.file_name))
+            
+            for fname, fbytes in formatted.images:
+                files.append(discord.File(io.BytesIO(fbytes), filename=fname))
+
             if len(content) <= DISCORD_MESSAGE_LIMIT:
-                await message.reply(content, allowed_mentions=_NO_PINGS)
+                if files:
+                    await message.reply(content, files=files, allowed_mentions=_NO_PINGS)
+                else:
+                    await message.reply(content, allowed_mentions=_NO_PINGS)
                 return
+
             if formatted.file_text is not None:
                 header = self._file_header(content)
-                attachment = self._as_file(formatted.file_text, formatted.file_name)
                 await message.reply(
-                    header, file=attachment, allowed_mentions=_NO_PINGS
+                    header, files=files, allowed_mentions=_NO_PINGS
                 )
                 return
+            
             # No file fallback available -> hard-trim to Discord's limit.
-            await message.reply(
-                content[:DISCORD_MESSAGE_LIMIT], allowed_mentions=_NO_PINGS
-            )
+            if files:
+                await message.reply(
+                    content[:DISCORD_MESSAGE_LIMIT], files=files, allowed_mentions=_NO_PINGS
+                )
+            else:
+                await message.reply(
+                    content[:DISCORD_MESSAGE_LIMIT], allowed_mentions=_NO_PINGS
+                )
         except discord.HTTPException as exc:
             log.warning("Failed to deliver result to channel: %s", type(exc).__name__)
 

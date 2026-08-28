@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -32,6 +32,8 @@ class ExecutionResult:
     truncated: bool = False
     # Optional human-readable message for BLOCKED / INTERNAL_ERROR states.
     message: str = ""
+    # Generated images (e.g. from plt.show) as (filename, bytes)
+    images: list[tuple[str, bytes]] = field(default_factory=list)
 
     @property
     def timed_out(self) -> bool:
