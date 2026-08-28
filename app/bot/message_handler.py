@@ -275,13 +275,16 @@ class MessageHandler:
         content = formatted.content
         try:
             files = []
-            if formatted.file_text is not None:
+            # Only attach output.txt if the content exceeds Discord's message limit
+            needs_file = formatted.file_text is not None and len(content) > DISCORD_MESSAGE_LIMIT
+            
+            if needs_file:
                 files.append(self._as_file(formatted.file_text, formatted.file_name))
             
             for fname, fbytes in formatted.images:
                 files.append(discord.File(io.BytesIO(fbytes), filename=fname))
 
-            embed = discord.Embed(description=content, color=0x2b2d31)
+            embed = discord.Embed(description=content[:4096], color=0x2b2d31)
             
             if len(content) <= DISCORD_MESSAGE_LIMIT:
                 if files:
@@ -290,15 +293,7 @@ class MessageHandler:
                     await message.reply(embed=embed, allowed_mentions=_NO_PINGS)
                 return
 
-            if formatted.file_text is not None:
-                header = self._file_header(content)
-                await message.reply(
-                    header, files=files, allowed_mentions=_NO_PINGS
-                )
-                return
-            
-            # No file fallback available -> hard-trim to Discord's limit.
-            if formatted.file_text is not None:
+            if needs_file:
                 fallback_embed = discord.Embed(
                     description=f"⚠️ Output too long. See attached `{formatted.file_name}`.",
                     color=0x2b2d31
