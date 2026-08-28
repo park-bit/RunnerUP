@@ -136,21 +136,55 @@ class MessageHandler:
         # 3.2) Interactive input
         stdin_input = ""
         if client and validation.requires_input(code):
-            await self._reply(message, "Code requires input. Please reply with your input wrapped in ```input ... ``` within 20 seconds.")
             import asyncio
-            import re
             
-            def check(m):
-                return m.author == message.author and m.channel == message.channel and "```input" in m.content
+            future = asyncio.Future()
+            
+            class InputModal(discord.ui.Modal, title='Provide Input for Execution'):
+                text_input = discord.ui.TextInput(
+                    label='Standard Input',
+                    style=discord.TextStyle.paragraph,
+                    placeholder='Type your input here...',
+                    required=False
+                )
+
+                async def on_submit(self, interaction: discord.Interaction):
+                    await interaction.response.send_message("Input received! Executing...", ephemeral=True)
+                    if not future.done():
+                        future.set_result(self.text_input.value)
+
+            class InputView(discord.ui.View):
+                def __init__(self):
+                    super().__init__(timeout=20.0)
+
+                @discord.ui.button(label='Provide Input', style=discord.ButtonStyle.primary)
+                async def provide_input(self, interaction: discord.Interaction, button: discord.ui.Button):
+                    if interaction.user.id != message.author.id:
+                        await interaction.response.send_message("Only the author can provide input.", ephemeral=True)
+                        return
+                    await interaction.response.send_modal(InputModal())
+
+            view = InputView()
+            prompt_msg = await self._reply(
+                message, 
+                "⚠️ **Input Required:** Your code uses `input()`. Click the button below to provide the standard input (times out in 20s).", 
+                view=view
+            )
             
             try:
-                input_msg = await client.wait_for('message', check=check, timeout=20.0)
-                match = re.search(r"```input\s*\n(.*?)\n?```", input_msg.content, re.DOTALL)
-                if match:
-                    stdin_input = match.group(1)
+                stdin_input = await asyncio.wait_for(future, timeout=20.0)
             except asyncio.TimeoutError:
-                await self._reply(message, "Input not provided.")
+                if prompt_msg:
+                    await prompt_msg.edit(content="❌ **Input not provided.** Execution cancelled.", view=None)
                 return
+            finally:
+                if prompt_msg:
+                    for child in view.children:
+                        child.disabled = True
+                    try:
+                        await prompt_msg.edit(view=view)
+                    except Exception:
+                        pass
 
         # 4) Concurrency slot: at most one execution at a time (+ tiny queue).
         if not await self.guard.acquire():
@@ -280,14 +314,15 @@ class MessageHandler:
         except discord.HTTPException as exc:
             log.warning("Failed to deliver result to channel: %s", type(exc).__name__)
 
-    async def _reply(self, message: discord.Message, content: str) -> None:
+    async def _reply(self, message: discord.Message, content: str, **kwargs) -> Optional[discord.Message]:
         """Send a short control/notice message to the originating channel."""
         try:
-            await message.reply(
-                content[:DISCORD_MESSAGE_LIMIT], allowed_mentions=_NO_PINGS
+            return await message.reply(
+                content[:DISCORD_MESSAGE_LIMIT], allowed_mentions=_NO_PINGS, **kwargs
             )
         except discord.HTTPException as exc:
             log.warning("Failed to send notice: %s", type(exc).__name__)
+            return None
 
     @staticmethod
     def _as_file(text: str, name: str) -> discord.File:
