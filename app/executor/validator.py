@@ -42,58 +42,16 @@ class ValidationResult:
 
 
 # --- Blocklists (root module names) ----------------------------------------
-# These are conservative. Benign compute modules (math, random, json, datetime,
-# itertools, functools, collections, statistics, decimal, re, string, ...) are
-# intentionally NOT blocked.
-BLOCKED_MODULES = frozenset(
-    {
-        # process / system
-        "os", "sys", "subprocess", "signal", "resource", "gc", "atexit",
-        "platform", "getpass", "pwd", "grp", "spwd", "crypt", "nt",
-        # filesystem
-        "shutil", "pathlib", "tempfile", "glob", "fileinput", "linecache",
-        "fcntl", "mmap", "pty", "tty", "termios",
-        # networking
-        "socket", "ssl", "select", "selectors", "asyncio",
-        "requests", "urllib", "urllib2", "urllib3", "http", "httpx", "httplib",
-        "aiohttp", "websocket", "websockets", "ftplib", "smtplib", "poplib",
-        "imaplib", "telnetlib", "nntplib", "xmlrpc", "socketserver", "wsgiref",
-        # low-level / FFI
-        "ctypes", "cffi", "_ctypes",
-        # import machinery / introspection
-        "importlib", "imp", "runpy", "pkgutil", "modulefinder", "inspect",
-        "builtins", "__builtin__",
-        # serialization that can execute code / touch disk
-        "pickle", "cpickle", "_pickle", "marshal", "shelve", "dbm", "sqlite3",
-        # concurrency (thread/process bombs)
-        "multiprocessing", "threading", "_thread", "thread", "concurrent",
-        "sched",
-        # debuggers / tracing
-        "code", "codeop", "pdb", "bdb", "trace", "tracemalloc",
-        # misc side effects
-        "webbrowser",
-    }
-)
+# Disabled per user request to allow all modules.
+BLOCKED_MODULES = frozenset()
 
 # Builtins/identifiers that are dangerous when *used*.
-BLOCKED_NAMES = frozenset(
-    {
-        "eval", "exec", "compile", "open", "__import__",
-        "breakpoint", "exit", "quit", "globals", "locals", "vars",
-        "memoryview", "setattr", "delattr",
-    }
-)
+# Disabled per user request.
+BLOCKED_NAMES = frozenset()
 
 # Dunder attributes commonly used to escape a restricted namespace.
-BLOCKED_ATTRIBUTES = frozenset(
-    {
-        "__subclasses__", "__bases__", "__base__", "__mro__", "__subclasshook__",
-        "__globals__", "__code__", "__closure__", "__func__", "__self__",
-        "__dict__", "__class__", "__builtins__", "__import__", "__loader__",
-        "__spec__", "__getattribute__", "__reduce__", "__reduce_ex__",
-        "__init_subclass__", "__class_getitem__",
-    }
-)
+# Disabled per user request.
+BLOCKED_ATTRIBUTES = frozenset()
 
 
 def validate_length(code: str, max_length: int) -> ValidationResult:

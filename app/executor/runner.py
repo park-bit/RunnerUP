@@ -32,36 +32,11 @@ import sys
 import traceback
 
 # NOTE: keep this in sync with BLOCKED_MODULES in app/executor/validator.py.
-# It is duplicated on purpose so this harness has zero project imports.
-_BLOCKED_MODULES = frozenset(
-    {
-        "os", "sys", "subprocess", "signal", "resource", "gc", "atexit",
-        "platform", "getpass", "pwd", "grp", "spwd", "crypt", "nt",
-        "shutil", "pathlib", "tempfile", "glob", "fileinput", "linecache",
-        "fcntl", "mmap", "pty", "tty", "termios",
-        "socket", "ssl", "select", "selectors", "asyncio",
-        "requests", "urllib", "urllib2", "urllib3", "http", "httpx", "httplib",
-        "aiohttp", "websocket", "websockets", "ftplib", "smtplib", "poplib",
-        "imaplib", "telnetlib", "nntplib", "xmlrpc", "socketserver", "wsgiref",
-        "ctypes", "cffi", "_ctypes",
-        "importlib", "imp", "runpy", "pkgutil", "modulefinder", "inspect",
-        "builtins", "__builtin__",
-        "pickle", "cpickle", "_pickle", "marshal", "shelve", "dbm", "sqlite3",
-        "multiprocessing", "threading", "_thread", "thread", "concurrent",
-        "sched",
-        "code", "codeop", "pdb", "bdb", "trace", "tracemalloc",
-        "webbrowser",
-    }
-)
+# Disabled per user request to allow all modules.
+_BLOCKED_MODULES = frozenset()
 
-_DENIED_BUILTINS = frozenset(
-    {
-        "eval", "exec", "compile", "open", "__import__",
-        "breakpoint", "exit", "quit", "globals", "locals", "vars",
-        "memoryview", "setattr", "delattr",
-        "help", "copyright", "credits", "license",
-    }
-)
+# Disabled per user request.
+_DENIED_BUILTINS = frozenset()
 
 _real_import = _builtins_mod.__import__
 
