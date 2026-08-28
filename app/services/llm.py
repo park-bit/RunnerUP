@@ -57,22 +57,33 @@ class LLMService:
             "temperature": 0.3,
         }
 
-        try:
-            resp = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json=payload,
-                headers=headers,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            description = data["choices"][0]["message"]["content"]
-            return description.strip()
-        except httpx.HTTPStatusError as exc:
-            log.warning("Groq API error: %s", exc.response.text)
-            return f"(Failed to generate description: API error {exc.response.status_code})"
-        except Exception as exc:  # noqa: BLE001
-            log.warning("Failed to generate code description from Groq: %s", type(exc).__name__)
-            return f"(Failed to generate description: {exc})"
+        models_to_try = [self._model, "llama-3.1-8b-instant", "gemma2-9b-it", "mixtral-8x7b-32768"]
+        models_to_try = list(dict.fromkeys(models_to_try))
+        
+        last_error = ""
+        for model in models_to_try:
+            payload["model"] = model
+            try:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json=payload,
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                description = data["choices"][0]["message"]["content"]
+                return description.strip()
+            except httpx.HTTPStatusError as exc:
+                log.warning("Groq API error for model %s: %s", model, exc.response.text)
+                last_error = f"API error {exc.response.status_code}"
+                if exc.response.status_code not in (400, 429, 404):
+                    break
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Failed to generate code description from Groq (model %s): %s", model, type(exc).__name__)
+                last_error = str(exc)
+                break
+
+        return f"(Failed to generate description: {last_error})"
 
     async def close(self) -> None:
         if self._client is not None:
