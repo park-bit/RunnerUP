@@ -115,22 +115,23 @@ class PyRunnerClient(discord.Client):
         
         # If no valid python file was attached, try parsing the message text
         if code is None:
-            if self._execute_all:
-                blocks = extract_all_python_code(
-                    message.content, allow_unmarked=self._allow_unmarked
-                )
-                if blocks:
-                    code = "\n".join(blocks)
-                elif not self.settings.REQUIRE_PYTHON_CODE_BLOCK:
-                    code = message.content.strip()
+            content = message.content.strip()
+            # If the user used python/py on the first line instead of backticks
+            if not self.settings.REQUIRE_PYTHON_CODE_BLOCK and (content.lower().startswith("python\n") or content.lower().startswith("py\n")):
+                code = content.split("\n", 1)[1].strip()
             else:
-                extracted = extract_python_code(
-                    message.content, allow_unmarked=self._allow_unmarked
-                )
-                if extracted is not None:
-                    code = extracted
-                elif not self.settings.REQUIRE_PYTHON_CODE_BLOCK:
-                    code = message.content.strip()
+                if self._execute_all:
+                    blocks = extract_all_python_code(
+                        message.content, allow_unmarked=self._allow_unmarked
+                    )
+                    if blocks:
+                        code = "\n".join(blocks)
+                else:
+                    extracted = extract_python_code(
+                        message.content, allow_unmarked=self._allow_unmarked
+                    )
+                    if extracted is not None:
+                        code = extracted
                     
             if not code:
                 return
