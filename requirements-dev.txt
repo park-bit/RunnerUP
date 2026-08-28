@@ -1,0 +1,6 @@
+# Development / test dependencies.
+# Install with:  pip install -r requirements-dev.txt
+-r requirements.txt
+
+# Test runner. Tests use asyncio.run() directly, so no async plugin is needed.
+pytest==8.3.4

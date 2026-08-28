@@ -1,0 +1,22 @@
+# Keep the image small and the build context clean.
+.git
+.gitignore
+.github
+.venv
+venv
+env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+.env
+.env.*
+!.env.example
+*.md
+Dockerfile
+.dockerignore
+render.yaml
