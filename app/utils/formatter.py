@@ -77,7 +77,10 @@ def format_execution(
         body, was_truncated = _truncate(result.stdout, max_output_length)
         truncated = was_truncated or result.truncated
         if body.strip() == "":
-            content = f"✅ Execution complete\n\nNo output.\n\n⏱️ {duration}"
+            if result.images:
+                content = f"✅ Execution complete\n\n⏱️ {duration}"
+            else:
+                content = f"✅ Execution complete\n\nNo output.\n\n⏱️ {duration}"
             return FormattedMessage(_with_note(content, truncated), images=result.images)
         content = (
             "✅ Execution complete\n\n"
