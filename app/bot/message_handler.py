@@ -318,7 +318,7 @@ class MessageHandler:
 
     # -- delivery -------------------------------------------------------------
     async def _deliver_result(
-        self, message: discord.Message, formatted: FormattedMessage
+        self, message: discord.Message, formatted: FormattedMessage, status_msg: discord.Message = None
     ) -> None:
         """Deliver an execution result honoring ``OUTPUT_MODE``."""
         mode = self.settings.OUTPUT_MODE
@@ -328,7 +328,7 @@ class MessageHandler:
         # If LLM is enabled, webhook is strictly for descriptions and bot is strictly for output.
         if self.llm_service and self.llm_service.enabled:
             # Always send execution result to channel
-            await self._send_channel(message, formatted)
+            await self._send_channel(message, formatted, status_msg)
             return
 
         # Fallback to original behavior if LLM is not enabled
@@ -341,7 +341,7 @@ class MessageHandler:
             )
 
         if want_bot or not delivered_webhook:
-            await self._send_channel(message, formatted)
+            await self._send_channel(message, formatted, status_msg)
 
     async def _send_channel(
         self, message: discord.Message, formatted: FormattedMessage, status_msg: discord.Message = None
