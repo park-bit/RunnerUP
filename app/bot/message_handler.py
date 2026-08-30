@@ -72,6 +72,14 @@ class MessageHandler:
     # -- entry point ----------------------------------------------------------
     async def handle(self, message: discord.Message, code: str, client: discord.Client = None) -> None:
         """Top-level guard so a failure never bubbles into the event loop."""
+        import contextlib
+        typing_cm = None
+        try:
+            typing_cm = message.channel.typing()
+            await typing_cm.__aenter__()
+        except Exception:
+            typing_cm = None
+            
         try:
             await self._process(message, code, client)
         except Exception:  # noqa: BLE001 - the listener must never crash
@@ -79,6 +87,10 @@ class MessageHandler:
                 "Unhandled error while processing message %s",
                 getattr(message, "id", "?"),
             )
+        finally:
+            if typing_cm is not None:
+                with contextlib.suppress(Exception):
+                    await typing_cm.__aexit__(None, None, None)
 
     async def handle_command(self, message: discord.Message, command: str) -> None:
         """Handle shell commands like !pip install"""
@@ -283,7 +295,7 @@ class MessageHandler:
                 
                 asyncio.create_task(fetch_and_send_description(code))
                 
-            result = await self._execute_with_typing(message, code, stdin_input)
+            result = await self.executor.execute(code, stdin_input)
         finally:
             self.guard.release()
 
@@ -295,26 +307,7 @@ class MessageHandler:
         )
         await self._deliver_result(message, formatted, status_msg)
 
-    async def _execute_with_typing(
-        self, message: discord.Message, code: str, stdin_input: str = ""
-    ) -> ExecutionResult:
-        """Run the code, showing a typing indicator while it works.
 
-        The typing indicator is purely cosmetic; if it cannot be started (e.g.
-        missing permissions) execution proceeds anyway.
-        """
-        typing_cm = None
-        try:
-            typing_cm = message.channel.typing()
-            await typing_cm.__aenter__()
-        except Exception:  # noqa: BLE001 - typing is optional
-            typing_cm = None
-        try:
-            return await self.executor.execute(code, stdin_input)
-        finally:
-            if typing_cm is not None:
-                with contextlib.suppress(Exception):
-                    await typing_cm.__aexit__(None, None, None)
 
     # -- delivery -------------------------------------------------------------
     async def _deliver_result(
