@@ -100,9 +100,10 @@ class SubprocessExecutor(CodeExecutor):
             "PYRUNNER_MAX_MEMORY_MB": str(self.max_memory_mb),
             "PYRUNNER_MAX_CPU_SECONDS": str(self.timeout + 1),
             "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
             "LANG": "C.UTF-8",
             "LC_ALL": "C.UTF-8",
-            "HOME": "/tmp",
+            "HOME": os.environ.get("HOME", "/tmp"),
             "TMPDIR": "/tmp",
         }
         if not _IS_POSIX:
