@@ -104,6 +104,9 @@ class SubprocessExecutor(CodeExecutor):
             "LC_ALL": "C.UTF-8",
             "HOME": os.environ.get("HOME", "/tmp"),
             "TMPDIR": "/tmp",
+            "OPENBLAS_NUM_THREADS": "1",
+            "MKL_NUM_THREADS": "1",
+            "OMP_NUM_THREADS": "1",
         }
         if not _IS_POSIX:
             # On Windows the interpreter needs SystemRoot to start. This is not
