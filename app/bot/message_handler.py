@@ -252,8 +252,17 @@ class MessageHandler:
                         pass
 
         # 4) Concurrency slot: at most one execution at a time (+ tiny queue).
+        bot_name = client.user.display_name if (client and client.user) else "Bot"
+        if message.guild and message.guild.me:
+            bot_name = message.guild.me.display_name
+            
+        status_msg = await self._reply(message, f"⏳ **{bot_name}** is thinking...")
+        
         if not await self.guard.acquire():
-            await self._reply(message, formatter.busy_message())
+            if status_msg:
+                await status_msg.edit(content=formatter.busy_message())
+            else:
+                await self._reply(message, formatter.busy_message())
             return
 
         # 5) Execute (bounded), releasing the slot no matter what happens.
@@ -284,7 +293,7 @@ class MessageHandler:
             timeout_seconds=s.MAX_EXECUTION_TIME,
             max_output_length=s.MAX_OUTPUT_LENGTH,
         )
-        await self._deliver_result(message, formatted)
+        await self._deliver_result(message, formatted, status_msg)
 
     async def _execute_with_typing(
         self, message: discord.Message, code: str, stdin_input: str = ""
@@ -335,7 +344,7 @@ class MessageHandler:
             await self._send_channel(message, formatted)
 
     async def _send_channel(
-        self, message: discord.Message, formatted: FormattedMessage
+        self, message: discord.Message, formatted: FormattedMessage, status_msg: discord.Message = None
     ) -> None:
         content = formatted.content
         try:
@@ -353,9 +362,17 @@ class MessageHandler:
             
             if len(content) <= DISCORD_MESSAGE_LIMIT:
                 if files:
+                    if status_msg:
+                        try:
+                            await status_msg.delete()
+                        except Exception:
+                            pass
                     await message.reply(embed=embed, files=files, allowed_mentions=_NO_PINGS)
                 else:
-                    await message.reply(embed=embed, allowed_mentions=_NO_PINGS)
+                    if status_msg:
+                        await status_msg.edit(content=None, embed=embed, allowed_mentions=_NO_PINGS)
+                    else:
+                        await message.reply(embed=embed, allowed_mentions=_NO_PINGS)
                 return
 
             if needs_file:
@@ -363,6 +380,11 @@ class MessageHandler:
                     description=f"⚠️ Output too long. See attached `{formatted.file_name}`.",
                     color=0x2b2d31
                 )
+                if status_msg:
+                    try:
+                        await status_msg.delete()
+                    except Exception:
+                        pass
                 await message.reply(
                     embed=fallback_embed,
                     files=files,
@@ -370,7 +392,10 @@ class MessageHandler:
                 )
             else:
                 fallback_embed = discord.Embed(description="⚠️ Output too long, but no file available.", color=0xed4245)
-                await message.reply(embed=fallback_embed, allowed_mentions=_NO_PINGS)
+                if status_msg:
+                    await status_msg.edit(content=None, embed=fallback_embed, allowed_mentions=_NO_PINGS)
+                else:
+                    await message.reply(embed=fallback_embed, allowed_mentions=_NO_PINGS)
         except discord.HTTPException as exc:
             log.warning("Failed to deliver result to channel: %s", type(exc).__name__)
 
