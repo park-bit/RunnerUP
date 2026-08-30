@@ -87,10 +87,9 @@ class SubprocessExecutor(CodeExecutor):
     # -- process configuration ------------------------------------------------
     @property
     def _command(self) -> List[str]:
-        # -E: ignore environment variables (like PYTHONPATH)
         # -B: don't write .pyc files
         # -X utf8: force UTF-8 stdio regardless of locale
-        return [self.python_executable, "-E", "-B", "-X", "utf8", self.runner_path]
+        return [self.python_executable, "-B", "-X", "utf8", self.runner_path]
 
     def _build_env(self, code: str) -> Dict[str, str]:
         # Deliberately minimal: no DISCORD_TOKEN / webhook / secrets are ever
