@@ -101,6 +101,12 @@ class PyRunnerClient(discord.Client):
         # 2) Strict detection. Pure string work that returns None for prose,
         #    other languages, or unmarked blocks (unless explicitly allowed).
         
+        # Check for shell commands like !pip install
+        content = message.content.strip()
+        if content.startswith("!"):
+            await self._handler.handle_command(message, content[1:].strip())
+            return
+
         code = None
         # Check for .py file attachments first
         if message.attachments:

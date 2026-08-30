@@ -80,6 +80,48 @@ class MessageHandler:
                 getattr(message, "id", "?"),
             )
 
+    async def handle_command(self, message: discord.Message, command: str) -> None:
+        """Handle shell commands like !pip install"""
+        if not command.startswith("pip install "):
+            return
+            
+        status_msg = await self._reply(message, f"⏳ Running `{command}`...")
+        
+        import asyncio
+        import sys
+        
+        args = command.split()
+        
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60.0)
+            
+            output = stdout.decode("utf-8", errors="replace")
+            if not output.strip():
+                output = "Done."
+                
+            from app.utils.formatter import _sanitize_for_block, _truncate, _with_note, DISCORD_MESSAGE_LIMIT
+            
+            truncated_out, was_truncated = _truncate(output, DISCORD_MESSAGE_LIMIT - 100)
+            final_out = _with_note(truncated_out, was_truncated)
+            
+            reply = f"✅ Command finished (exit code {proc.returncode}):\n```text\n{_sanitize_for_block(final_out)}\n```"
+            if status_msg:
+                await status_msg.edit(content=reply)
+            else:
+                await self._reply(message, reply)
+            
+        except asyncio.TimeoutError:
+            if status_msg:
+                await status_msg.edit(content="❌ Command timed out after 60 seconds.")
+        except Exception as e:
+            if status_msg:
+                await status_msg.edit(content=f"❌ Failed to run command: {e}")
+
     # -- pipeline -------------------------------------------------------------
     async def _process(self, message: discord.Message, code: str, client: discord.Client = None) -> None:
         s = self.settings
