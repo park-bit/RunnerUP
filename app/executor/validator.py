@@ -151,6 +151,15 @@ def validate(code: str, max_length: int) -> ValidationResult:
     return validate_security(code)
 
 
+PACKAGE_MAPPING = {
+    "sklearn": "scikit-learn",
+    "cv2": "opencv-python-headless",
+    "PIL": "Pillow",
+    "bs4": "beautifulsoup4",
+    "yaml": "PyYAML",
+    "dotenv": "python-dotenv",
+}
+
 class _DependencyVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
         self.dependencies: Set[str] = set()
@@ -162,9 +171,9 @@ class _DependencyVisitor(ast.NodeVisitor):
                 import importlib.util
                 try:
                     if importlib.util.find_spec(root) is None:
-                        self.dependencies.add(root)
+                        self.dependencies.add(PACKAGE_MAPPING.get(root, root))
                 except Exception:
-                    self.dependencies.add(root)
+                    self.dependencies.add(PACKAGE_MAPPING.get(root, root))
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
@@ -174,9 +183,9 @@ class _DependencyVisitor(ast.NodeVisitor):
                 import importlib.util
                 try:
                     if importlib.util.find_spec(root) is None:
-                        self.dependencies.add(root)
+                        self.dependencies.add(PACKAGE_MAPPING.get(root, root))
                 except Exception:
-                    self.dependencies.add(root)
+                    self.dependencies.add(PACKAGE_MAPPING.get(root, root))
         self.generic_visit(node)
 
 
